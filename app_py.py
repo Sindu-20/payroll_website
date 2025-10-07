@@ -38,7 +38,14 @@ conn.commit()
 # UI: Title
 st.title("💼 Employee Payroll System")
 
-menu = ["Add Employee", "Mark Attendance", "View Employees", "Generate Salary Slip"]
+#  UPDATED: Menu includes Delete option
+menu = [
+    "Add Employee",
+    "Mark Attendance",
+    "View Employees",
+    "Generate Salary Slip",
+    "Delete Employee"
+]
 choice = st.sidebar.selectbox("Menu", menu)
 
 # Add Employee
@@ -59,23 +66,29 @@ elif choice == "Mark Attendance":
     cursor.execute("SELECT emp_id, name FROM employees")
     data = cursor.fetchall()
     emp_dict = {f"{name} (ID: {emp_id})": emp_id for emp_id, name in data}
-    emp_name = st.selectbox("Select Employee", list(emp_dict.keys()))
-    status = st.radio("Status", ["Present", "Absent"])
-    date = st.date_input("Date", datetime.today()).strftime("%Y-%m-%d")
+    if emp_dict:
+        emp_name = st.selectbox("Select Employee", list(emp_dict.keys()))
+        status = st.radio("Status", ["Present", "Absent"])
+        date = st.date_input("Date", datetime.today()).strftime("%Y-%m-%d")
 
-    if st.button("Submit Attendance"):
-        emp_id = emp_dict[emp_name]
-        cursor.execute("INSERT INTO attendance (emp_id, date, status) VALUES (?, ?, ?)",
-                       (emp_id, date, status))
-        conn.commit()
-        st.success(f"Attendance for {emp_name} marked as {status}.")
+        if st.button("Submit Attendance"):
+            emp_id = emp_dict[emp_name]
+            cursor.execute("INSERT INTO attendance (emp_id, date, status) VALUES (?, ?, ?)",
+                        (emp_id, date, status))
+            conn.commit()
+            st.success(f"Attendance for {emp_name} marked as {status}.")
+    else:
+        st.warning("No employees found. Please add employees first.")
 
 # View Employees
 elif choice == "View Employees":
     st.subheader("👥 Employee List")
     cursor.execute("SELECT * FROM employees")
     rows = cursor.fetchall()
-    st.table(rows)
+    if rows:
+        st.table(rows)
+    else:
+        st.info("No employees added yet.")
 
 # Generate Salary Slip
 elif choice == "Generate Salary Slip":
@@ -105,6 +118,23 @@ elif choice == "Generate Salary Slip":
         else:
             st.error("Employee not found.")
 
-# Commented out IPython magic to ensure Python compatibility.
-# %pip install streamlit
+#  Delete Employee
+elif choice == "Delete Employee":
+    st.subheader("🗑️ Delete Employee Record")
 
+    cursor.execute("SELECT emp_id, name FROM employees")
+    employees = cursor.fetchall()
+
+    if not employees:
+        st.warning("No employees found to delete.")
+    else:
+        emp_dict = {f"{name} (ID: {emp_id})": emp_id for emp_id, name in employees}
+        selected_emp = st.selectbox("Select Employee to Delete", list(emp_dict.keys()))
+        emp_id_to_delete = emp_dict[selected_emp]
+
+        confirm = st.checkbox("I confirm I want to delete this employee and their attendance data.")
+        if st.button("Delete Employee") and confirm:
+            cursor.execute("DELETE FROM attendance WHERE emp_id = ?", (emp_id_to_delete,))
+            cursor.execute("DELETE FROM employees WHERE emp_id = ?", (emp_id_to_delete,))
+            conn.commit()
+            st.success(f"Employee '{selected_emp}' and all related attendance records deleted.")
